@@ -1,7 +1,24 @@
 const router = require('express').Router();
+const jwt = require('jsonwebtoken');
+const {jwtSecret} = require('../config/secrets');
+const bcrypt = require('bcryptjs');
+const Users = require('../users/user-model');
+//require ('./auth/auth-middleware')
 
 router.post('/register', (req, res) => {
-  res.end('implement register, please!');
+  //res.end('implement register, please!');
+  let user = req.body
+  const hash = bcrypt.hashSync(user.password, 10) // hash the password
+
+  user.password = hash;
+  Users.add(user) // save user to our database
+  .then((saved) => {
+    res.status(201).json(saved)
+  })
+  .catch((error) => {
+    res.status(500).json(error);
+  });
+});
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -26,10 +43,39 @@ router.post('/register', (req, res) => {
     4- On FAILED registration due to the `username` being taken,
       the response body should include a string exactly as follows: "username taken".
   */
-});
+
 
 router.post('/login', (req, res) => {
-  res.end('implement login, please!');
+  //res.end('implement login, please!');
+  let { username, password } = req.body
+  Users.findBy({username})
+  .first()
+  .then((user) => {
+    if (user && bcrypt.compareSync(password, user.password)) {
+      const token = generateToken(user);
+      res.status(200).json({
+        message: `Welcome ${user.username}`, token
+      });
+    } else {
+      res.status(401).json({message: 'Sorry, your credentials are incorrect'});
+    }
+  })
+  .catch((error) => {
+    res.status(500).json(error)
+  })
+});
+
+function generateToken(user){
+  const payload = {
+    subject: user.id,
+    username: user.username,
+    date: Date.now()
+  }
+  const options = {
+    expires: '1h'
+  }
+  return jwt.sign(payload, jwtSecret, options)
+}
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -53,6 +99,6 @@ router.post('/login', (req, res) => {
     4- On FAILED login due to `username` not existing in the db, or `password` being incorrect,
       the response body should include a string exactly as follows: "invalid credentials".
   */
-});
+
 
 module.exports = router;
